@@ -1,14 +1,42 @@
-import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
+import * as SecureStore from "expo-secure-store";
+import { setToken } from "../../api/vkserfingApi";
 
 export default function LoginScreen({ navigation }) {
-  const [token, setToken] = useState("");
+  const [token, setTokenInput] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  const handleLogin = () => {
-    if (token.length > 5) {
-      navigation.replace("Main");
+  // Автоматический вход, если токен сохранён
+  useEffect(() => {
+    async function checkSavedToken() {
+      const saved = await SecureStore.getItemAsync("token");
+      if (saved) {
+        setToken(saved);
+        navigation.replace("Main");
+      } else {
+        setLoading(false);
+      }
     }
+    checkSavedToken();
+  }, []);
+
+  const handleLogin = async () => {
+    if (token.length < 5) return;
+
+    await SecureStore.setItemAsync("token", token);
+    setToken(token);
+
+    navigation.replace("Main");
   };
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -18,7 +46,7 @@ export default function LoginScreen({ navigation }) {
         style={styles.input}
         placeholder="Введите токен"
         value={token}
-        onChangeText={setToken}
+        onChangeText={setTokenInput}
       />
 
       <TouchableOpacity style={styles.button} onPress={handleLogin}>
