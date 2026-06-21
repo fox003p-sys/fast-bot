@@ -1,43 +1,60 @@
 {
   "expo": {
-    "name": "FastBot",
-    "slug": "fast-bot",
+    "name": "VKSerfing Bot",
+    "slug": "vkserfing-bot-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "scheme": "vkserfingbot",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#1a1a2e"
     },
-    "updates": {
-      "fallbackToCacheTimeout": 0
-    },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
     "ios": {
-      "supportsTabletMode": true,
-      "bundleIdentifier": "com.fox003p.fastbot"
+      "supportsTablet": true,
+      "bundleIdentifier": "com.vkserfing.bot",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false
+        }
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1a1a2e"
       },
-      "package": "com.fox003p.fastbot",
-      "permissions": []
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
+      "package": "com.vkserfing.bot",
+      "permissions": [
+        "INTERNET",
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED"
+      ]
     },
     "plugins": [
+      "expo-router",
       [
-        "expo-secure-store",
+        "expo-notifications",
         {
-          "faceIDPermission": "Allow $(PRODUCT_NAME) to access your face ID."
+          "icon": "./assets/notification-icon.png",
+          "color": "#4f46e5"
         }
-      ]
-    ]
+      ],
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "295e81ef-cfba-41b4-aab7-78395097e148"
+      }
+    }
   }
 }

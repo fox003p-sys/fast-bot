@@ -1,37 +1,48 @@
 {
-  "name": "fast-bot",
+  "name": "vkserfing-bot-app",
   "version": "1.0.0",
-  "description": "Mobile bot app for vkserfing.com",
-  "main": "node_modules/expo/AppEntry.js",
+  "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
-    "eject": "expo eject",
-    "eas-build": "eas build",
-    "eas-submit": "eas submit"
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
   },
- "dependencies": {
-  "expo": "50.0.0",
-  "expo-status-bar": "1.11.1",
-  "react": "18.2.0",
-  "react-native": "0.73.6",
-
-  "@react-navigation/native": "6.1.9",
-  "@react-navigation/bottom-tabs": "6.5.20",
-  "@react-navigation/stack": "6.3.20",
-
-  "react-native-screens": "3.27.0",
-  "react-native-safe-area-context": "4.7.4",
-  "react-native-gesture-handler": "2.14.0",
-  "react-native-reanimated": "3.5.0",
-
-  "axios": "1.6.0",
-  "expo-secure-store": "12.0.0"
-},
+  "dependencies": {
+    "@expo/vector-icons": "^14.0.4",
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "@react-navigation/bottom-tabs": "^7.2.0",
+    "@react-navigation/native": "^7.0.14",
+    "axios": "^1.7.9",
+    "expo": "^56.0.12",
+    "expo-asset": "^56.0.17",
+    "expo-constants": "~17.0.0",
+    "expo-device": "~7.0.0",
+    "expo-file-system": "^56.0.8",
+    "expo-linking": "~7.0.0",
+    "expo-modules-core": "^56.0.17",
+    "expo-notifications": "~0.29.0",
+    "expo-router": "~4.0.0",
+    "expo-secure-store": "~14.0.0",
+    "expo-status-bar": "~2.0.0",
+    "expo-system-ui": "~4.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-native": "^0.72.7",
+    "react-native-gesture-handler": "~2.20.2",
+    "react-native-reanimated": "~3.16.1",
+    "react-native-safe-area-context": "4.12.0",
+    "react-native-screens": "~4.4.0",
+    "react-native-webview": "13.12.5",
+    "zustand": "^5.0.2"
+  },
   "devDependencies": {
-    "@babel/core": "7.23.0"
+    "@babel/core": "^7.25.2",
+    "@types/react": "~18.3.12",
+    "babel-plugin-module-resolver": "^5.0.2",
+    "typescript": "~5.3.3"
   },
   "private": true
 }

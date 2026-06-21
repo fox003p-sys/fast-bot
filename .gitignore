@@ -1,15 +1,39 @@
+# Dependencies
 node_modules/
+
+# Expo
 .expo/
-.expo-shared/
 dist/
-npm-debug.*
+web-build/
+
+# Native
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
 *.orig.*
-web-build/
+android/
+ios/
+
+# Env & secrets
 .env
 .env.local
+.env.*.local
+
+# Captured session data (contains cookies!)
+tools/captures/
+docs/endpoints-captured.json
+*.har
+
+# OS
 .DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+npm-debug.*
+*.log

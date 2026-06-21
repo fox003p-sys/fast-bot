@@ -1,27 +1,21 @@
 {
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
   "build": {
-    "preview": {
-      "android": {
-        "buildType": "apk"
-      },
-      "ios": {
-        "simulator": true
-      }
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
     },
-    "preview2": {
-      "android": {
-        "buildType": "apk"
-      },
-      "ios": {
-        "simulator": true
-      }
+    "preview": {
+      "distribution": "internal",
+      "android": { "buildType": "apk" }
     },
     "production": {
-      "android": {
-        "buildType": "app-bundle"
-      },
-      "ios": {
-        "simulator": false
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_ENABLE_MOCK_API": "false"
       }
     }
   },
