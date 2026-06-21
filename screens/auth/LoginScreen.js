@@ -1,142 +1,42 @@
-import React, { useState } from 'react';
-import {
-  View,
-  TextInput,
-  TouchableOpacity,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
-import AuthContext from '../../context/AuthContext';
+import React, { useState } from "react";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
 
-const LoginScreen = ({ navigation }) => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { signIn } = React.useContext(AuthContext);
+export default function LoginScreen({ navigation }) {
+  const [token, setToken] = useState("");
 
-  const handleLogin = async () => {
-    if (!username || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
-
-    setLoading(true);
-    const result = await signIn(username, password);
-    setLoading(false);
-
-    if (!result.success) {
-      Alert.alert('Login Failed', result.error || 'Unknown error occurred');
+  const handleLogin = () => {
+    if (token.length > 5) {
+      navigation.replace("Main");
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <View style={styles.content}>
-        <Text style={styles.title}>FastBot</Text>
-        <Text style={styles.subtitle}>vkserfing.com Bot</Text>
+    <View style={styles.container}>
+      <Text style={styles.title}>FAST BOT</Text>
 
-        <View style={styles.form}>
-          <TextInput
-            style={styles.input}
-            placeholder="Username"
-            placeholderTextColor="#999"
-            value={username}
-            onChangeText={setUsername}
-            editable={!loading}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="#999"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-            editable={!loading}
-          />
+      <TextInput
+        style={styles.input}
+        placeholder="Введите токен"
+        value={token}
+        onChangeText={setToken}
+      />
 
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Login</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+      <TouchableOpacity style={styles.button} onPress={handleLogin}>
+        <Text style={styles.buttonText}>Войти</Text>
+      </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => navigation.navigate('Register')} disabled={loading}>
-          <Text style={styles.link}>Don't have an account? Register</Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+      <TouchableOpacity onPress={() => navigation.navigate("Register")}>
+        <Text style={styles.link}>Регистрация</Text>
+      </TouchableOpacity>
+    </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1a1a2e',
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#00d4ff',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    marginBottom: 40,
-  },
-  form: {
-    marginBottom: 20,
-  },
-  input: {
-    backgroundColor: '#0f0f1e',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    color: '#fff',
-    borderWidth: 1,
-    borderColor: '#333',
-  },
-  button: {
-    backgroundColor: '#00d4ff',
-    borderRadius: 8,
-    padding: 14,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#000',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  link: {
-    color: '#00d4ff',
-    textAlign: 'center',
-    textDecorationLine: 'underline',
-  },
+  container: { flex: 1, justifyContent: "center", padding: 20 },
+  title: { fontSize: 32, fontWeight: "bold", textAlign: "center", marginBottom: 40 },
+  input: { borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 20 },
+  button: { backgroundColor: "#007AFF", padding: 15, borderRadius: 10 },
+  buttonText: { color: "#fff", textAlign: "center", fontSize: 18 },
+  link: { marginTop: 20, textAlign: "center", color: "#007AFF" }
 });
-
-export default LoginScreen;
