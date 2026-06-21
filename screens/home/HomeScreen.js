@@ -1,14 +1,33 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { getBalance } from "../../api/vkserfingApi"; // путь под твой проект
 
 export default function HomeScreen() {
+  const [balance, setBalance] = useState(null);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const data = await getBalance();
+        setBalance(data.balance ?? 0);
+      } catch (e) {
+        console.log("Ошибка загрузки баланса:", e);
+        setBalance(0);
+      }
+    }
+
+    load();
+  }, []);
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>FAST BOT</Text>
 
       <View style={styles.card}>
         <Text style={styles.label}>Баланс:</Text>
-        <Text style={styles.value}>0.00 ₽</Text>
+        <Text style={styles.value}>
+          {balance === null ? "..." : `${balance} ₽`}
+        </Text>
       </View>
 
       <TouchableOpacity style={styles.button}>
@@ -28,7 +47,4 @@ const styles = StyleSheet.create({
     marginBottom: 20
   },
   label: { fontSize: 18 },
-  value: { fontSize: 26, fontWeight: "bold" },
-  button: { backgroundColor: "#007AFF", padding: 15, borderRadius: 10 },
-  buttonText: { color: "#fff", textAlign: "center", fontSize: 18 }
-});
+  value: { fontSize: 26, fontWeight
