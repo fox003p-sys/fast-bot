@@ -6,15 +6,32 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "API_URL": "https://vkserfing.com/api"
+      }
     },
     "preview": {
       "distribution": "internal",
-      "android": { "buildType": "apk" }
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:bundleRelease"
+      },
+      "env": {
+        "API_URL": "https://vkserfing.com/api"
+      }
     },
     "production": {
       "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease"
+      },
       "env": {
+        "API_URL": "https://vkserfing.com/api",
         "EXPO_PUBLIC_ENABLE_MOCK_API": "false"
       }
     }
