@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
   View,
   TextInput,
@@ -10,17 +10,19 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import AuthContext from '../../context/AuthContext';
 
 const LoginScreen = ({ navigation }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn } = React.useContext(AuthContext);
+  const [showPassword, setShowPassword] = useState(false);
+  const { signIn } = useContext(AuthContext);
 
   const handleLogin = async () => {
     if (!username || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert('Ошибка', 'Пожалуйста, заполните все поля');
       return;
     }
 
@@ -29,7 +31,7 @@ const LoginScreen = ({ navigation }) => {
     setLoading(false);
 
     if (!result.success) {
-      Alert.alert('Login Failed', result.error || 'Unknown error occurred');
+      Alert.alert('Ошибка входа', result.error || 'Произошла неизвестная ошибка');
     }
   };
 
@@ -40,26 +42,44 @@ const LoginScreen = ({ navigation }) => {
     >
       <View style={styles.content}>
         <Text style={styles.title}>FastBot</Text>
-        <Text style={styles.subtitle}>vkserfing.com Bot</Text>
+        <Text style={styles.subtitle}>Бот для VKSerfing</Text>
 
         <View style={styles.form}>
-          <TextInput
-            style={styles.input}
-            placeholder="Username"
-            placeholderTextColor="#999"
-            value={username}
-            onChangeText={setUsername}
-            editable={!loading}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="#999"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-            editable={!loading}
-          />
+          <View style={styles.inputGroup}>
+            <Ionicons name="person" size={20} color="#666" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Имя пользователя или Email"
+              placeholderTextColor="#999"
+              value={username}
+              onChangeText={setUsername}
+              editable={!loading}
+              autoCapitalize="none"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Ionicons name="lock-closed" size={20} color="#666" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Пароль"
+              placeholderTextColor="#999"
+              secureTextEntry={!showPassword}
+              value={password}
+              onChangeText={setPassword}
+              editable={!loading}
+            />
+            <TouchableOpacity 
+              style={styles.eyeIcon}
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              <Ionicons 
+                name={showPassword ? 'eye-off' : 'eye'} 
+                size={20} 
+                color="#666" 
+              />
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
@@ -69,13 +89,22 @@ const LoginScreen = ({ navigation }) => {
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Login</Text>
+              <Text style={styles.buttonText}>Войти</Text>
             )}
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.forgotButton}
+            onPress={() => Alert.alert('Восстановление пароля', 'Обратитесь в поддержку VKSerfing')}
+          >
+            <Text style={styles.forgotText}>Забыли пароль?</Text>
           </TouchableOpacity>
         </View>
 
+        <View style={styles.divider} />
+
         <TouchableOpacity onPress={() => navigation.navigate('Register')} disabled={loading}>
-          <Text style={styles.link}>Don't have an account? Register</Text>
+          <Text style={styles.link}>Нет аккаунта? Зарегистрироваться</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -108,14 +137,30 @@ const styles = StyleSheet.create({
   form: {
     marginBottom: 20,
   },
+  inputGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  inputIcon: {
+    position: 'absolute',
+    left: 12,
+    zIndex: 1,
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: 12,
+  },
   input: {
     backgroundColor: '#0f0f1e',
     borderRadius: 8,
     padding: 12,
-    marginBottom: 12,
+    paddingLeft: 40,
+    paddingRight: 40,
     color: '#fff',
     borderWidth: 1,
     borderColor: '#333',
+    flex: 1,
   },
   button: {
     backgroundColor: '#00d4ff',
@@ -131,6 +176,22 @@ const styles = StyleSheet.create({
     color: '#000',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  forgotButton: {
+    alignItems: 'flex-end',
+    marginTop: 8,
+  },
+  forgotText: {
+    color: '#00d4ff',
+    fontSize: 12,
+    textDecorationLine: 'underline',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#333',
+    marginVertical: 20,
+    width: '80%',
+    alignSelf: 'center',
   },
   link: {
     color: '#00d4ff',

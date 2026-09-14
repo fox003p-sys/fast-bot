@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -11,11 +11,13 @@ import { getStoredToken } from './src/utils/tokenStorage';
 // Screens
 import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
+import BotScreen from './src/screens/BotScreen';
 import HomeScreen from './src/screens/home/HomeScreen';
 import CampaignsScreen from './src/screens/campaigns/CampaignsScreen';
 import ProfileScreen from './src/screens/profile/ProfileScreen';
 import CampaignDetailScreen from './src/screens/campaigns/CampaignDetailScreen';
 import PostsScreen from './src/screens/posts/PostsScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -77,10 +79,18 @@ function AppStack() {
       }}
     >
       <Tab.Screen
+        name="Bot"
+        component={BotScreen}
+        options={{
+          tabBarLabel: 'Бот',
+          tabBarIcon: ({ color }) => <View style={{ width: 24, height: 24, backgroundColor: color, borderRadius: 4 }} />,
+        }}
+      />
+      <Tab.Screen
         name="Home"
         component={HomeStack}
         options={{
-          tabBarLabel: 'Home',
+          tabBarLabel: 'Главная',
           tabBarIcon: ({ color }) => <View style={{ width: 24, height: 24, backgroundColor: color, borderRadius: 4 }} />,
         }}
       />
@@ -88,7 +98,15 @@ function AppStack() {
         name="Campaigns"
         component={CampaignsStack}
         options={{
-          tabBarLabel: 'Campaigns',
+          tabBarLabel: 'Кампании',
+          tabBarIcon: ({ color }) => <View style={{ width: 24, height: 24, backgroundColor: color, borderRadius: 4 }} />,
+        }}
+      />
+      <Tab.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{
+          tabBarLabel: 'Настройки',
           tabBarIcon: ({ color }) => <View style={{ width: 24, height: 24, backgroundColor: color, borderRadius: 4 }} />,
         }}
       />
@@ -96,7 +114,7 @@ function AppStack() {
         name="Profile"
         component={ProfileScreen}
         options={{
-          tabBarLabel: 'Profile',
+          tabBarLabel: 'Профиль',
           tabBarIcon: ({ color }) => <View style={{ width: 24, height: 24, backgroundColor: color, borderRadius: 4 }} />,
         }}
       />
@@ -136,43 +154,66 @@ export default function App() {
     () => ({
       signIn: async (username, password) => {
         try {
-          const response = await fetch('https://api.vkserfing.com/auth/login', {
+          // Используем API vkserfing.com
+          const response = await fetch('https://vkserfing.com/api/auth/login', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password }),
+            headers: { 
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: JSON.stringify({ 
+              login: username, 
+              password: password,
+              remember: true 
+            }),
           });
           const data = await response.json();
-          if (data.token) {
-            await SecureStore.setItemAsync('userToken', data.token);
-            dispatch({ type: 'SIGN_IN', token: data.token });
-            return { success: true };
+          
+          if (data.status === 'success' && data.data && data.data.token) {
+            await SecureStore.setItemAsync('userToken', data.data.token);
+            await SecureStore.setItemAsync('userSession', JSON.stringify(data.data));
+            dispatch({ type: 'SIGN_IN', token: data.data.token });
+            return { success: true, user: data.data };
           }
-          return { success: false, error: data.message };
+          return { success: false, error: data.message || 'Неизвестная ошибка' };
         } catch (error) {
-          return { success: false, error: error.message };
+          console.error('Login error:', error);
+          return { success: false, error: error.message || 'Ошибка сети' };
         }
       },
       signUp: async (username, email, password) => {
         try {
-          const response = await fetch('https://api.vkserfing.com/auth/register', {
+          const response = await fetch('https://vkserfing.com/api/auth/register', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, email, password }),
+            headers: { 
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: JSON.stringify({ 
+              username: username, 
+              email: email,
+              password: password 
+            }),
           });
           const data = await response.json();
-          if (data.token) {
-            await SecureStore.setItemAsync('userToken', data.token);
-            dispatch({ type: 'SIGN_IN', token: data.token });
-            return { success: true };
+          
+          if (data.status === 'success' && data.data && data.data.token) {
+            await SecureStore.setItemAsync('userToken', data.data.token);
+            await SecureStore.setItemAsync('userSession', JSON.stringify(data.data));
+            dispatch({ type: 'SIGN_IN', token: data.data.token });
+            return { success: true, user: data.data };
           }
-          return { success: false, error: data.message };
+          return { success: false, error: data.message || 'Неизвестная ошибка' };
         } catch (error) {
-          return { success: false, error: error.message };
+          console.error('Register error:', error);
+          return { success: false, error: error.message || 'Ошибка сети' };
         }
       },
       signOut: async () => {
         try {
           await SecureStore.deleteItemAsync('userToken');
+          await SecureStore.deleteItemAsync('userSession');
+          await SecureStore.deleteItemAsync('botSettings');
           dispatch({ type: 'SIGN_OUT' });
         } catch (error) {
           console.error('Failed to sign out:', error);

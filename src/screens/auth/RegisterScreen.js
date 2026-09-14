@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
   View,
   TextInput,
@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import AuthContext from '../../context/AuthContext';
 
 const RegisterScreen = ({ navigation }) => {
@@ -18,16 +19,21 @@ const RegisterScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signUp } = React.useContext(AuthContext);
+  const { signUp } = useContext(AuthContext);
 
   const handleRegister = async () => {
     if (!username || !email || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert('Ошибка', 'Пожалуйста, заполните все поля');
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      Alert.alert('Ошибка', 'Пароли не совпадают');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Ошибка', 'Пароль должен содержать не менее 6 символов');
       return;
     }
 
@@ -35,8 +41,12 @@ const RegisterScreen = ({ navigation }) => {
     const result = await signUp(username, email, password);
     setLoading(false);
 
-    if (!result.success) {
-      Alert.alert('Registration Failed', result.error || 'Unknown error occurred');
+    if (result.success) {
+      Alert.alert('Успех', 'Регистрация прошла успешно!', [
+        { text: 'OK', onPress: () => navigation.navigate('Bot') }
+      ]);
+    } else {
+      Alert.alert('Ошибка регистрации', result.error || 'Произошла неизвестная ошибка');
     }
   };
 
@@ -46,49 +56,66 @@ const RegisterScreen = ({ navigation }) => {
       style={styles.container}
     >
       <View style={styles.content}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← Back</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#00d4ff" />
+          <Text style={styles.backButtonText}>Назад</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>Create Account</Text>
-        <Text style={styles.subtitle}>Join FastBot</Text>
+        <Text style={styles.title}>Регистрация</Text>
+        <Text style={styles.subtitle}>Создайте аккаунт в FastBot</Text>
 
         <View style={styles.form}>
-          <TextInput
-            style={styles.input}
-            placeholder="Username"
-            placeholderTextColor="#999"
-            value={username}
-            onChangeText={setUsername}
-            editable={!loading}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor="#999"
-            keyboardType="email-address"
-            value={email}
-            onChangeText={setEmail}
-            editable={!loading}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="#999"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-            editable={!loading}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Confirm Password"
-            placeholderTextColor="#999"
-            secureTextEntry
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            editable={!loading}
-          />
+          <View style={styles.inputGroup}>
+            <Ionicons name="person" size={20} color="#666" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Имя пользователя"
+              placeholderTextColor="#999"
+              value={username}
+              onChangeText={setUsername}
+              editable={!loading}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Ionicons name="mail" size={20} color="#666" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor="#999"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              value={email}
+              onChangeText={setEmail}
+              editable={!loading}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Ionicons name="lock-closed" size={20} color="#666" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Пароль"
+              placeholderTextColor="#999"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+              editable={!loading}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Ionicons name="lock-closed" size={20} color="#666" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Подтвердите пароль"
+              placeholderTextColor="#999"
+              secureTextEntry
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              editable={!loading}
+            />
+          </View>
 
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
@@ -98,13 +125,13 @@ const RegisterScreen = ({ navigation }) => {
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Register</Text>
+              <Text style={styles.buttonText}>Зарегистрироваться</Text>
             )}
           </TouchableOpacity>
         </View>
 
         <TouchableOpacity onPress={() => navigation.navigate('Login')} disabled={loading}>
-          <Text style={styles.link}>Already have an account? Login</Text>
+          <Text style={styles.link}>Уже есть аккаунт? Войти</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -122,9 +149,15 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 30,
+    padding: 8,
+  },
+  backButtonText: {
     color: '#00d4ff',
     fontSize: 16,
-    marginBottom: 20,
+    marginLeft: 8,
   },
   title: {
     fontSize: 32,
@@ -142,21 +175,32 @@ const styles = StyleSheet.create({
   form: {
     marginBottom: 20,
   },
+  inputGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  inputIcon: {
+    position: 'absolute',
+    left: 12,
+    zIndex: 1,
+  },
   input: {
     backgroundColor: '#0f0f1e',
     borderRadius: 8,
     padding: 12,
-    marginBottom: 12,
+    paddingLeft: 40,
     color: '#fff',
     borderWidth: 1,
     borderColor: '#333',
+    flex: 1,
   },
   button: {
     backgroundColor: '#00d4ff',
     borderRadius: 8,
     padding: 14,
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 20,
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -170,6 +214,7 @@ const styles = StyleSheet.create({
     color: '#00d4ff',
     textAlign: 'center',
     textDecorationLine: 'underline',
+    marginTop: 16,
   },
 });
 
