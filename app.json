@@ -6,11 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1a1a2e"
-    },
     "updates": {
       "fallbackToCacheTimeout": 0
     },
@@ -69,7 +64,9 @@
           }
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-status-bar",
+      "expo-asset"
     ]
   }
 }
