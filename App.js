@@ -1,12 +1,14 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, View, Alert } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import NetInfo from '@react-native-community/netinfo';
 
 import AuthContext from './src/context/AuthContext';
-import { getStoredToken } from './src/utils/tokenStorage';
+import { getStoredToken, saveToken, saveSession, clearAuthData } from './src/utils/tokenStorage';
+import { authAPI, userAPI } from './src/api/endpoints';
 
 // Screens
 import LoginScreen from './src/screens/auth/LoginScreen';
@@ -28,6 +30,7 @@ function AuthStack() {
       screenOptions={{
         headerShown: false,
         animationEnabled: true,
+        contentStyle: { backgroundColor: '#1a1a2e' },
       }}
     >
       <Stack.Screen name="Login" component={LoginScreen} />
@@ -44,6 +47,7 @@ function HomeStack() {
         headerStyle: { backgroundColor: '#1a1a2e' },
         headerTintColor: '#00d4ff',
         headerTitleStyle: { fontWeight: 'bold', color: '#fff' },
+        contentStyle: { backgroundColor: '#1a1a2e' },
       }}
     >
       <Stack.Screen name="HomeTab" component={HomeScreen} options={{ title: 'Home' }} />
@@ -60,6 +64,7 @@ function CampaignsStack() {
         headerStyle: { backgroundColor: '#1a1a2e' },
         headerTintColor: '#00d4ff',
         headerTitleStyle: { fontWeight: 'bold', color: '#fff' },
+        contentStyle: { backgroundColor: '#1a1a2e' },
       }}
     >
       <Stack.Screen name="CampaignsTab" component={CampaignsScreen} options={{ title: 'Campaigns' }} />
@@ -76,6 +81,7 @@ function AppStack() {
         tabBarInactiveTintColor: '#666',
         tabBarStyle: { backgroundColor: '#0f0f1e', borderTopColor: '#333' },
         headerShown: false,
+        lazy: true, // Optimize: Load screens lazily
       }}
     >
       <Tab.Screen
@@ -129,99 +135,133 @@ export default function App() {
         case 'RESTORE_TOKEN':
           return { ...prevState, userToken: action.token, isLoading: false };
         case 'SIGN_IN':
-          return { ...prevState, isSignout: false, userToken: action.token };
+          return { ...prevState, isSignout: false, userToken: action.token, userSession: action.user };
         case 'SIGN_OUT':
-          return { ...prevState, isSignout: true, userToken: null };
+          return { ...prevState, isSignout: true, userToken: null, userSession: null };
       }
     },
-    { isLoading: true, isSignout: false, userToken: null }
+    { isLoading: true, isSignout: false, userToken: null, userSession: null }
   );
 
-  useEffect(() => {
-    const bootstrapAsync = async () => {
-      try {
-        const token = await getStoredToken();
-        dispatch({ type: 'RESTORE_TOKEN', token });
-      } catch (e) {
-        console.error('Failed to restore token:', e);
-      }
-    };
-
-    bootstrapAsync();
-  }, []);
-
-  const authContext = React.useMemo(
+  // Memoized auth context for performance
+  const authContext = useMemo(
     () => ({
       signIn: async (username, password) => {
         try {
-          // Используем API vkserfing.com
-          const response = await fetch('https://vkserfing.com/api/auth/login', {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            body: JSON.stringify({ 
-              login: username, 
-              password: password,
-              remember: true 
-            }),
-          });
-          const data = await response.json();
+          // Check network connectivity
+          const networkState = await NetInfo.fetch();
+          if (!networkState.isConnected) {
+            Alert.alert('Ошибка', 'Нет подключения к интернету');
+            return { success: false, error: 'Нет подключения к интернету' };
+          }
+
+          const response = await authAPI.login(username, password);
+          const data = response.data;
           
           if (data.status === 'success' && data.data && data.data.token) {
-            await SecureStore.setItemAsync('userToken', data.data.token);
-            await SecureStore.setItemAsync('userSession', JSON.stringify(data.data));
-            dispatch({ type: 'SIGN_IN', token: data.data.token });
+            await saveToken(data.data.token);
+            await saveSession(data.data);
+            dispatch({ type: 'SIGN_IN', token: data.data.token, user: data.data });
             return { success: true, user: data.data };
           }
           return { success: false, error: data.message || 'Неизвестная ошибка' };
         } catch (error) {
           console.error('Login error:', error);
-          return { success: false, error: error.message || 'Ошибка сети' };
+          const errorMessage = error.response?.data?.message || 
+                             error.message || 
+                             'Ошибка сети';
+          return { success: false, error: errorMessage };
         }
       },
+      
       signUp: async (username, email, password) => {
         try {
-          const response = await fetch('https://vkserfing.com/api/auth/register', {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            body: JSON.stringify({ 
-              username: username, 
-              email: email,
-              password: password 
-            }),
-          });
-          const data = await response.json();
+          // Check network connectivity
+          const networkState = await NetInfo.fetch();
+          if (!networkState.isConnected) {
+            Alert.alert('Ошибка', 'Нет подключения к интернету');
+            return { success: false, error: 'Нет подключения к интернету' };
+          }
+
+          const response = await authAPI.register(username, email, password);
+          const data = response.data;
           
           if (data.status === 'success' && data.data && data.data.token) {
-            await SecureStore.setItemAsync('userToken', data.data.token);
-            await SecureStore.setItemAsync('userSession', JSON.stringify(data.data));
-            dispatch({ type: 'SIGN_IN', token: data.data.token });
+            await saveToken(data.data.token);
+            await saveSession(data.data);
+            dispatch({ type: 'SIGN_IN', token: data.data.token, user: data.data });
             return { success: true, user: data.data };
           }
           return { success: false, error: data.message || 'Неизвестная ошибка' };
         } catch (error) {
           console.error('Register error:', error);
-          return { success: false, error: error.message || 'Ошибка сети' };
+          const errorMessage = error.response?.data?.message || 
+                             error.message || 
+                             'Ошибка сети';
+          return { success: false, error: errorMessage };
         }
       },
+      
       signOut: async () => {
         try {
-          await SecureStore.deleteItemAsync('userToken');
-          await SecureStore.deleteItemAsync('userSession');
-          await SecureStore.deleteItemAsync('botSettings');
+          await clearAuthData();
           dispatch({ type: 'SIGN_OUT' });
         } catch (error) {
           console.error('Failed to sign out:', error);
         }
       },
+      
+      getUserProfile: async () => {
+        try {
+          const response = await userAPI.getProfile();
+          return response.data;
+        } catch (error) {
+          console.error('Failed to get user profile:', error);
+          throw error;
+        }
+      },
     }),
-    []
+    [state.userToken]
   );
+
+  useEffect(() => {
+    const bootstrapAsync = async () => {
+      try {
+        // Check network connectivity
+        const networkState = await NetInfo.fetch();
+        if (!networkState.isConnected) {
+          dispatch({ type: 'RESTORE_TOKEN', token: null });
+          return;
+        }
+
+        const token = await getStoredToken();
+        
+        // Validate token if exists
+        if (token) {
+          try {
+            const response = await authAPI.validateToken();
+            if (response.data.status !== 'success') {
+              await clearAuthData();
+              dispatch({ type: 'RESTORE_TOKEN', token: null });
+              return;
+            }
+          } catch (error) {
+            console.warn('Token validation failed:', error);
+            await clearAuthData();
+            dispatch({ type: 'RESTORE_TOKEN', token: null });
+            return;
+          }
+        }
+        
+        dispatch({ type: 'RESTORE_TOKEN', token });
+      } catch (e) {
+        console.error('Failed to restore token:', e);
+        dispatch({ type: 'RESTORE_TOKEN', token: null });
+      }
+    };
+
+    bootstrapAsync();
+  }, []);
 
   if (state.isLoading) {
     return (

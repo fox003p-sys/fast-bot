@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,260 +12,261 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import AuthContext from '../context/AuthContext';
-import { botAPI } from '../api/endpoints';
+import * as SecureStore from 'expo-secure-store';
+import NetInfo from '@react-native-community/netinfo';
+
+import { botAPI, userAPI } from '../api/endpoints';
+import { useApi, useDebouncedSearch } from '../hooks';
+import { getStoredToken } from '../utils/tokenStorage';
 
 const BotScreen = ({ navigation }) => {
-  const { userToken } = useContext(AuthContext);
-  const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [autoLike, setAutoLike] = useState(false);
   const [autoComment, setAutoComment] = useState(false);
   const [commentText, setCommentText] = useState('');
-  const [stats, setStats] = useState({
-    likesGiven: 0,
-    commentsPosted: 0,
-    tasksCompleted: 0,
+  const [isOnline, setIsOnline] = useState(true);
+
+  // Use custom hook for tasks
+  const {
+    data: tasks,
+    loading: tasksLoading,
+    error: tasksError,
+    execute: loadTasks,
+    retry: retryTasks,
+  } = useApi(botAPI.getTasks, {
+    immediate: false,
+    maxRetries: 3,
+    onError: (err) => {
+      console.error('Error loading tasks:', err);
+      if (err.message !== 'Network not available') {
+        Alert.alert('Ошибка', 'Не удалось загрузить задачи');
+      }
+    },
   });
 
-  const loadTasks = async () => {
-    if (!userToken) return;
-    
-    setLoading(true);
-    try {
-      // Загружаем задачи с API vkserfing
-      const response = await fetch('https://vkserfing.com/api/tasks', {
-        headers: {
-          'Authorization': `Bearer ${userToken}`,
-        },
-      });
-      const data = await response.json();
-      
-      if (data.status === 'success') {
-        setTasks(data.data || []);
-      } else {
-        console.warn('Failed to load tasks:', data.message);
-      }
-    } catch (error) {
-      console.error('Error loading tasks:', error);
-      Alert.alert('Ошибка', 'Не удалось загрузить задачи');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Use custom hook for stats
+  const {
+    data: stats,
+    loading: statsLoading,
+    error: statsError,
+    execute: loadStats,
+    retry: retryStats,
+  } = useApi(userAPI.getStats, {
+    immediate: false,
+    maxRetries: 3,
+  });
 
-  const loadStats = async () => {
-    try {
-      const response = await fetch('https://vkserfing.com/api/user/stats', {
-        headers: {
-          'Authorization': `Bearer ${userToken}`,
-        },
-      });
-      const data = await response.json();
-      
-      if (data.status === 'success') {
-        setStats(data.data || stats);
-      }
-    } catch (error) {
-      console.error('Error loading stats:', error);
-    }
-  };
-
+  // Check network status
   useEffect(() => {
-    if (userToken) {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOnline(state.isConnected);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Load initial data
+  useEffect(() => {
+    if (isOnline) {
       loadTasks();
       loadStats();
     }
-  }, [userToken]);
+  }, [isOnline, loadTasks, loadStats]);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await Promise.all([loadTasks(), loadStats()]);
-    setRefreshing(false);
-  };
-
-  const handleLikeTask = async (task) => {
-    if (!userToken) {
-      Alert.alert('Ошибка', 'Вы не авторизованы');
-      return;
+  const onRefresh = useCallback(async () => {
+    if (isOnline) {
+      await Promise.all([loadTasks(), loadStats()]);
     }
+  }, [isOnline, loadTasks, loadStats]);
 
-    try {
-      const response = await fetch('https://vkserfing.com/api/tasks/like', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userToken}`,
-        },
-        body: JSON.stringify({
-          taskId: task.id,
-          postUrl: task.url,
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (data.status === 'success') {
-        Alert.alert('Успех', 'Лайк успешно поставлен!');
-        // Обновляем статистику
-        setStats(prev => ({ ...prev, likesGiven: prev.likesGiven + 1 }));
-        // Обновляем статус задачи
-        setTasks(tasks.map(t => t.id === task.id ? { ...t, status: 'completed' } : t));
-      } else {
-        Alert.alert('Ошибка', data.message || 'Не удалось поставить лайк');
+  // Memoized task rendering for performance
+  const renderTaskItem = useCallback((task) => {
+    const handleLikeTask = async () => {
+      if (!isOnline) {
+        Alert.alert('Ошибка', 'Нет подключения к интернету');
+        return;
       }
-    } catch (error) {
-      console.error('Error liking post:', error);
-      Alert.alert('Ошибка', 'Не удалось поставить лайк');
-    }
-  };
 
-  const handleCommentTask = async (task) => {
-    if (!userToken) {
-      Alert.alert('Ошибка', 'Вы не авторизованы');
-      return;
-    }
-
-    if (!commentText.trim()) {
-      Alert.alert('Ошибка', 'Введите текст комментария');
-      return;
-    }
-
-    try {
-      const response = await fetch('https://vkserfing.com/api/tasks/comment', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userToken}`,
-        },
-        body: JSON.stringify({
-          taskId: task.id,
-          postUrl: task.url,
-          comment: commentText,
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (data.status === 'success') {
-        Alert.alert('Успех', 'Комментарий успешно опубликован!');
-        setCommentText('');
-        // Обновляем статистику
-        setStats(prev => ({ ...prev, commentsPosted: prev.commentsPosted + 1 }));
-        // Обновляем статус задачи
-        setTasks(tasks.map(t => t.id === task.id ? { ...t, status: 'completed' } : t));
-      } else {
-        Alert.alert('Ошибка', data.message || 'Не удалось опубликовать комментарий');
+      try {
+        const response = await botAPI.likePost(task.id, task.url);
+        const data = response.data;
+        
+        if (data.status === 'success') {
+          Alert.alert('Успех', 'Лайк успешно поставлен!');
+          // Update local state immediately for better UX
+          loadTasks();
+          loadStats();
+        } else {
+          Alert.alert('Ошибка', data.message || 'Не удалось поставить лайк');
+        }
+      } catch (error) {
+        console.error('Error liking post:', error);
+        Alert.alert('Ошибка', 'Не удалось поставить лайк');
       }
-    } catch (error) {
-      console.error('Error commenting:', error);
-      Alert.alert('Ошибка', 'Не удалось опубликовать комментарий');
-    }
-  };
+    };
 
+    const handleCommentTask = async () => {
+      if (!isOnline) {
+        Alert.alert('Ошибка', 'Нет подключения к интернету');
+        return;
+      }
+
+      if (!commentText.trim()) {
+        Alert.alert('Ошибка', 'Введите текст комментария');
+        return;
+      }
+
+      try {
+        const response = await botAPI.commentPost(task.id, task.url, commentText);
+        const data = response.data;
+        
+        if (data.status === 'success') {
+          Alert.alert('Успех', 'Комментарий успешно опубликован!');
+          setCommentText('');
+          loadTasks();
+          loadStats();
+        } else {
+          Alert.alert('Ошибка', data.message || 'Не удалось опубликовать комментарий');
+        }
+      } catch (error) {
+        console.error('Error commenting:', error);
+        Alert.alert('Ошибка', 'Не удалось опубликовать комментарий');
+      }
+    };
+
+    return (
+      <View key={task.id} style={styles.taskCard}>
+        <View style={styles.taskHeader}>
+          <Text style={styles.taskTitle}>{task.title || 'Задача'}</Text>
+          <View style={[styles.statusBadge, {
+            backgroundColor: task.status === 'completed' ? '#22c55e' : 
+                            task.status === 'in_progress' ? '#f59e0b' : '#3b82f6'
+          }]}>
+            <Text style={styles.statusText}>{task.status === 'completed' ? 'Выполнено' : 
+                                                  task.status === 'in_progress' ? 'В процессе' : 'Ожидает'}</Text>
+          </View>
+        </View>
+        
+        <Text style={styles.taskDescription}>
+          {task.description || `Поставить ${task.type === 'like' ? 'лайк' : 'комментарий'} в VK`}
+        </Text>
+        
+        {task.url && (
+          <Text style={styles.taskUrl} numberOfLines={1}>
+            URL: {task.url}
+          </Text>
+        )}
+        
+        <View style={styles.taskActions}>
+          {task.type === 'like' && (
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={handleLikeTask}
+              disabled={task.status === 'completed'}
+            >
+              <Ionicons name="heart" size={20} color={task.status === 'completed' ? '#22c55e' : '#ef4444'} />
+              <Text style={[styles.actionText, { color: task.status === 'completed' ? '#22c55e' : '#ef4444' }]}>
+                {task.status === 'completed' ? 'Выполнено' : 'Лайк'}
+              </Text>
+            </TouchableOpacity>
+          )}
+          
+          {task.type === 'comment' && (
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={handleCommentTask}
+              disabled={task.status === 'completed'}
+            >
+              <Ionicons name="chatbubble" size={20} color={task.status === 'completed' ? '#22c55e' : '#3b82f6'} />
+              <Text style={[styles.actionText, { color: task.status === 'completed' ? '#22c55e' : '#3b82f6' }]}>
+                {task.status === 'completed' ? 'Выполнено' : 'Коммент'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        
+        {task.reward && (
+          <View style={styles.rewardContainer}>
+            <Text style={styles.rewardText}>★ Награда: {task.reward} монет</Text>
+          </View>
+        )}
+      </View>
+    );
+  }, []);
+
+  // Memoized stats component
+  const StatsSection = useMemo(() => (
+    <View style={styles.statsContainer}>
+      <Text style={styles.sectionTitle}>Ваша статистика</Text>
+      <View style={styles.statsGrid}>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{stats?.likesGiven || 0}</Text>
+          <Text style={styles.statLabel}>Лайков</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{stats?.commentsPosted || 0}</Text>
+          <Text style={styles.statLabel}>Комментариев</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{stats?.tasksCompleted || 0}</Text>
+          <Text style={styles.statLabel}>Задач выполнено</Text>
+        </View>
+      </View>
+    </View>
+  ), [stats]);
+
+  // Toggle auto-like setting
   const toggleAutoLike = async () => {
     const newValue = !autoLike;
     setAutoLike(newValue);
     
     try {
-      await fetch('https://vkserfing.com/api/settings/auto-like', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userToken}`,
-        },
-        body: JSON.stringify({ enabled: newValue }),
-      });
+      const token = await getStoredToken();
+      if (token) {
+        await fetch('https://vkserfing.com/api/settings/auto-like', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ enabled: newValue }),
+        });
+      }
     } catch (error) {
       console.error('Error updating auto-like setting:', error);
       setAutoLike(!newValue);
     }
   };
 
+  // Toggle auto-comment setting
   const toggleAutoComment = async () => {
     const newValue = !autoComment;
     setAutoComment(newValue);
     
     try {
-      await fetch('https://vkserfing.com/api/settings/auto-comment', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userToken}`,
-        },
-        body: JSON.stringify({ enabled: newValue, text: commentText }),
-      });
+      const token = await getStoredToken();
+      if (token) {
+        await fetch('https://vkserfing.com/api/settings/auto-comment', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ enabled: newValue, text: commentText }),
+        });
+      }
     } catch (error) {
       console.error('Error updating auto-comment setting:', error);
       setAutoComment(!newValue);
     }
   };
 
-  const renderTaskItem = (task) => (
-    <View key={task.id} style={styles.taskCard}>
-      <View style={styles.taskHeader}>
-        <Text style={styles.taskTitle}>{task.title || 'Задача'}</Text>
-        <View style={[styles.statusBadge, {
-          backgroundColor: task.status === 'completed' ? '#22c55e' : 
-                          task.status === 'in_progress' ? '#f59e0b' : '#3b82f6'
-        }]}>
-          <Text style={styles.statusText}>{task.status === 'completed' ? 'Выполнено' : 
-                                                  task.status === 'in_progress' ? 'В процессе' : 'Ожидает'}</Text>
-        </View>
-      </View>
-      
-      <Text style={styles.taskDescription}>
-        {task.description || `Поставить ${task.type === 'like' ? 'лайк' : 'комментарий'} в VK`}
-      </Text>
-      
-      {task.url && (
-        <Text style={styles.taskUrl} numberOfLines={1}>
-          URL: {task.url}
-        </Text>
-      )}
-      
-      <View style={styles.taskActions}>
-        {task.type === 'like' && (
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => handleLikeTask(task)}
-            disabled={task.status === 'completed'}
-          >
-            <Ionicons name="heart" size={20} color={task.status === 'completed' ? '#22c55e' : '#ef4444'} />
-            <Text style={[styles.actionText, { color: task.status === 'completed' ? '#22c55e' : '#ef4444' }]}>
-              {task.status === 'completed' ? 'Выполнено' : 'Лайк'}
-            </Text>
-          </TouchableOpacity>
-        )}
-        
-        {task.type === 'comment' && (
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => handleCommentTask(task)}
-            disabled={task.status === 'completed'}
-          >
-            <Ionicons name="chatbubble" size={20} color={task.status === 'completed' ? '#22c55e' : '#3b82f6'} />
-            <Text style={[styles.actionText, { color: task.status === 'completed' ? '#22c55e' : '#3b82f6' }]}>
-              {task.status === 'completed' ? 'Выполнено' : 'Коммент'}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
-      
-      {task.reward && (
-        <View style={styles.rewardContainer}>
-          <Text style={styles.rewardText}>⭐ Награда: {task.reward} монет</Text>
-        </View>
-      )}
-    </View>
-  );
-
-  if (loading && tasks.length === 0) {
+  // Loading state
+  if ((tasksLoading || statsLoading) && tasks?.length === 0) {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <ActivityIndicator size="large" color="#00d4ff" />
-        <Text style={styles.loadingText}>Загрузка задач...</Text>
+        <Text style={styles.loadingText}>Загрузка данных...</Text>
+        {!isOnline && <Text style={styles.offlineText}>Нет подключения к интернету</Text>}
       </View>
     );
   }
@@ -274,29 +275,14 @@ const BotScreen = ({ navigation }) => {
     <ScrollView
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00d4ff" />
+        <RefreshControl refreshing={tasksLoading || statsLoading} onRefresh={onRefresh} tintColor="#00d4ff" />
       }
+      contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled"
     >
-      {/* Статистика */}
-      <View style={styles.statsContainer}>
-        <Text style={styles.sectionTitle}>Ваша статистика</Text>
-        <View style={styles.statsGrid}>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{stats.likesGiven}</Text>
-            <Text style={styles.statLabel}>Лайков</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{stats.commentsPosted}</Text>
-            <Text style={styles.statLabel}>Комментариев</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{stats.tasksCompleted}</Text>
-            <Text style={styles.statLabel}>Задач выполнено</Text>
-          </View>
-        </View>
-      </View>
+      {StatsSection}
 
-      {/* Настройки авто-режима */}
+      {/* Auto-action settings */}
       <View style={styles.settingsContainer}>
         <Text style={styles.sectionTitle}>Авто-режим</Text>
         
@@ -334,15 +320,17 @@ const BotScreen = ({ navigation }) => {
         )}
       </View>
 
-      {/* Список задач */}
+      {/* Tasks list */}
       <View style={styles.tasksContainer}>
-        <Text style={styles.sectionTitle}>Доступные задачи ({tasks.length})</Text>
+        <Text style={styles.sectionTitle}>Доступные задачи ({tasks?.length || 0})</Text>
         
-        {tasks.length === 0 ? (
+        {(!tasks || tasks.length === 0) ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="list" size={48} color="#666" />
             <Text style={styles.emptyText}>Нет доступных задач</Text>
             <Text style={styles.emptySubtext}>Попробуйте обновить страницу</Text>
+            
+            {tasksError && <Text style={styles.errorText}>{tasksError.message}</Text>}
           </View>
         ) : (
           tasks.map(renderTaskItem)
@@ -361,6 +349,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#1a1a2e',
   },
+  scrollContent: {
+    paddingBottom: 20,
+  },
   centerContent: {
     flex: 1,
     justifyContent: 'center',
@@ -370,6 +361,11 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 16,
     fontSize: 16,
+  },
+  offlineText: {
+    color: '#ef4444',
+    marginTop: 8,
+    fontSize: 14,
   },
   statsContainer: {
     padding: 16,
@@ -422,12 +418,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#333',
-  },
-  settingItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
   },
   settingLabel: {
     fontSize: 16,
@@ -531,6 +521,12 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 12,
     marginTop: 4,
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
   },
   footer: {
     padding: 20,
