@@ -1,6 +1,10 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import NetInfo from '@react-native-community/netinfo';
+import * as Device from 'expo-device';
+import { Platform } from 'react-native';
+
+import { getHumanFingerprint, humanDelay, antiDetectionMiddleware } from '../utils/antiDetection';
 
 // Unified API configuration
 const BASE_URL = 'https://vkserfing.com/api';
@@ -21,7 +25,7 @@ const client = axios.create({
 const requestCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-// Request interceptor to add auth token
+// Add anti-detection middleware
 client.interceptors.request.use(
   async (config) => {
     try {
@@ -31,11 +35,19 @@ client.interceptors.request.use(
         throw new Error('Network not available');
       }
 
+      // Apply anti-detection headers
+      config = antiDetectionMiddleware(config);
+
       // Add auth token
       const token = await SecureStore.getItemAsync('userToken');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
+
+      // Add device-specific headers
+      config.headers['X-Device-Type'] = Device.deviceType || 'mobile';
+      config.headers['X-Platform'] = Platform.OS || 'ios';
+      config.headers['X-App-Version'] = '1.0.0';
 
       // Generate cache key for GET requests
       if (config.method === 'get') {
@@ -46,6 +58,10 @@ client.interceptors.request.use(
           return Promise.resolve(cachedResponse.response);
         }
       }
+
+      // Add random delay to requests to avoid rate limiting detection
+      const delay = humanDelay(100, 500);
+      await new Promise(resolve => setTimeout(resolve, delay));
 
       return config;
     } catch (error) {
@@ -86,6 +102,7 @@ client.interceptors.response.use(
             {
               headers: {
                 'Content-Type': 'application/json',
+                ...antiDetectionMiddleware({ headers: {} }).headers,
               },
             }
           );
@@ -94,6 +111,10 @@ client.interceptors.response.use(
             const newToken = refreshResponse.data.data.token;
             await SecureStore.setItemAsync('userToken', newToken);
             originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            
+            // Add anti-detection headers to retry request
+            originalRequest = antiDetectionMiddleware(originalRequest);
+            
             return client(originalRequest);
           }
         }
@@ -108,6 +129,34 @@ client.interceptors.response.use(
         await SecureStore.deleteItemAsync('userToken');
         await SecureStore.deleteItemAsync('userSession');
         await SecureStore.deleteItemAsync('refreshToken');
+      }
+    }
+
+    // Handle 403 Forbidden - might be rate limited or detected as bot
+    if (error.response?.status === 403) {
+      console.warn('Forbidden - possible bot detection, adding delay');
+      
+      // Wait longer before retrying
+      const delay = humanDelay(5000, 15000);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      if (originalRequest._retryCount < MAX_RETRIES) {
+        originalRequest._retryCount = (originalRequest._retryCount || 0) + 1;
+        return client(originalRequest);
+      }
+    }
+
+    // Handle 429 Too Many Requests
+    if (error.response?.status === 429) {
+      console.warn('Rate limited - waiting before retry');
+      
+      const retryAfter = error.response.headers['retry-after'] || 5;
+      const delay = (parseInt(retryAfter) + Math.random() * 5) * 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      if (originalRequest._retryCount < MAX_RETRIES) {
+        originalRequest._retryCount = (originalRequest._retryCount || 0) + 1;
+        return client(originalRequest);
       }
     }
 
@@ -145,6 +194,11 @@ function shouldRetry(error) {
     return true;
   }
   
+  // Retry on forbidden (403) - might be temporary
+  if (error.response.status === 403) {
+    return true;
+  }
+  
   return false;
 }
 
@@ -162,6 +216,11 @@ export const clearCacheKey = (key) => {
 export const invalidateCache = (url, params = {}) => {
   const cacheKey = `${url}:${JSON.stringify(params)}`;
   requestCache.delete(cacheKey);
+};
+
+// Get current fingerprint for debugging
+export const getCurrentFingerprint = () => {
+  return getHumanFingerprint();
 };
 
 export default client;
