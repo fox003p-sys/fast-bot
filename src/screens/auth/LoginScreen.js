@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   TextInput,
@@ -11,28 +11,15 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import AuthContext from '../../context/AuthContext';
 
 const LoginScreen = ({ navigation }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { signIn } = useContext(AuthContext);
 
-  const handleLogin = async () => {
-    if (!username || !password) {
-      Alert.alert('Ошибка', 'Пожалуйста, заполните все поля');
-      return;
-    }
-
-    setLoading(true);
-    const result = await signIn(username, password);
-    setLoading(false);
-
-    if (!result.success) {
-      Alert.alert('Ошибка входа', result.error || 'Произошла неизвестная ошибка');
-    }
+  const handleLogin = () => {
+    navigation.navigate('WebAuth', { mode: 'login' });
   };
 
   return (
@@ -105,6 +92,10 @@ const LoginScreen = ({ navigation }) => {
 
         <TouchableOpacity onPress={() => navigation.navigate('Register')} disabled={loading}>
           <Text style={styles.link}>Нет аккаунта? Зарегистрироваться</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => navigation.navigate('WebAuth', { mode: 'login' })} disabled={loading}>
+          <Text style={styles.link}>Войти через сайт</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -197,6 +188,7 @@ const styles = StyleSheet.create({
     color: '#00d4ff',
     textAlign: 'center',
     textDecorationLine: 'underline',
+    marginTop: 8,
   },
 });
 

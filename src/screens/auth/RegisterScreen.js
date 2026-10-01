@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   TextInput,
@@ -11,7 +11,6 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import AuthContext from '../../context/AuthContext';
 
 const RegisterScreen = ({ navigation }) => {
   const [username, setUsername] = useState('');
@@ -19,35 +18,9 @@ const RegisterScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signUp } = useContext(AuthContext);
 
-  const handleRegister = async () => {
-    if (!username || !email || !password || !confirmPassword) {
-      Alert.alert('Ошибка', 'Пожалуйста, заполните все поля');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      Alert.alert('Ошибка', 'Пароли не совпадают');
-      return;
-    }
-
-    if (password.length < 6) {
-      Alert.alert('Ошибка', 'Пароль должен содержать не менее 6 символов');
-      return;
-    }
-
-    setLoading(true);
-    const result = await signUp(username, email, password);
-    setLoading(false);
-
-    if (result.success) {
-      Alert.alert('Успех', 'Регистрация прошла успешно!', [
-        { text: 'OK', onPress: () => navigation.navigate('Bot') }
-      ]);
-    } else {
-      Alert.alert('Ошибка регистрации', result.error || 'Произошла неизвестная ошибка');
-    }
+  const handleRegister = () => {
+    navigation.navigate('WebAuth', { mode: 'register' });
   };
 
   return (
@@ -132,6 +105,10 @@ const RegisterScreen = ({ navigation }) => {
 
         <TouchableOpacity onPress={() => navigation.navigate('Login')} disabled={loading}>
           <Text style={styles.link}>Уже есть аккаунт? Войти</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => navigation.navigate('WebAuth', { mode: 'register' })} disabled={loading}>
+          <Text style={styles.link}>Зарегистрироваться через сайт</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

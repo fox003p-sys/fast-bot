@@ -13,6 +13,7 @@ import { authAPI, userAPI } from './src/api/endpoints';
 // Screens
 import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
+import WebAuthScreen from './src/screens/auth/WebAuthScreen';
 import BotScreen from './src/screens/BotScreen';
 import HomeScreen from './src/screens/home/HomeScreen';
 import CampaignsScreen from './src/screens/campaigns/CampaignsScreen';
@@ -35,6 +36,7 @@ function AuthStack() {
     >
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
+      <Stack.Screen name="WebAuth" component={WebAuthScreen} />
     </Stack.Navigator>
   );
 }
@@ -146,60 +148,14 @@ export default function App() {
   // Memoized auth context for performance
   const authContext = useMemo(
     () => ({
-      signIn: async (username, password) => {
-        try {
-          // Check network connectivity
-          const networkState = await NetInfo.fetch();
-          if (!networkState.isConnected) {
-            Alert.alert('Ошибка', 'Нет подключения к интернету');
-            return { success: false, error: 'Нет подключения к интернету' };
-          }
-
-          const response = await authAPI.login(username, password);
-          const data = response.data;
-          
-          if (data.status === 'success' && data.data && data.data.token) {
-            await saveToken(data.data.token);
-            await saveSession(data.data);
-            dispatch({ type: 'SIGN_IN', token: data.data.token, user: data.data });
-            return { success: true, user: data.data };
-          }
-          return { success: false, error: data.message || 'Неизвестная ошибка' };
-        } catch (error) {
-          console.error('Login error:', error);
-          const errorMessage = error.response?.data?.message || 
-                             error.message || 
-                             'Ошибка сети';
-          return { success: false, error: errorMessage };
-        }
+      signIn: async () => {
+        // Авторизация через WebView
+        return { success: true };
       },
       
-      signUp: async (username, email, password) => {
-        try {
-          // Check network connectivity
-          const networkState = await NetInfo.fetch();
-          if (!networkState.isConnected) {
-            Alert.alert('Ошибка', 'Нет подключения к интернету');
-            return { success: false, error: 'Нет подключения к интернету' };
-          }
-
-          const response = await authAPI.register(username, email, password);
-          const data = response.data;
-          
-          if (data.status === 'success' && data.data && data.data.token) {
-            await saveToken(data.data.token);
-            await saveSession(data.data);
-            dispatch({ type: 'SIGN_IN', token: data.data.token, user: data.data });
-            return { success: true, user: data.data };
-          }
-          return { success: false, error: data.message || 'Неизвестная ошибка' };
-        } catch (error) {
-          console.error('Register error:', error);
-          const errorMessage = error.response?.data?.message || 
-                             error.message || 
-                             'Ошибка сети';
-          return { success: false, error: errorMessage };
-        }
+      signUp: async () => {
+        // Регистрация через WebView
+        return { success: true };
       },
       
       signOut: async () => {
