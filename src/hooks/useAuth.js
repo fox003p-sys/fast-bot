@@ -51,13 +51,13 @@ export const useAuth = () => {
             } else {
               await clearAuthData();
             }
-          } catch (validationError) {
-            console.warn('Token validation failed:', validationError);
+          } catch (err) {
+            console.warn('Token validation failed:', err);
             await clearAuthData();
           }
         }
-      } catch (error) {
-        console.error('Failed to initialize auth:', error);
+      } catch (err) {
+        console.error('Failed to initialize auth:', err);
       } finally {
         setLoading(false);
       }
@@ -67,97 +67,22 @@ export const useAuth = () => {
   }, []);
 
   /**
-   * Sign in user
-   * @param {string} username - Username or email
-   * @param {string} password - Password
-   * @returns {Promise<Object>} - Result object with success status and user data
+   * Sign in user (handled via WebView)
+   * @returns {Promise<Object>} - Result object with success status
    */
-  const signIn = useCallback(async (username, password) => {
-    setError(null);
-    setLoading(true);
-
-    try {
-      if (!isOnline) {
-        Alert.alert('Ошибка', 'Нет подключения к интернету');
-        return { success: false, error: 'Нет подключения к интернету' };
-      }
-
-      const response = await authAPI.login(username, password);
-      const data = response.data;
-
-      if (data.status === 'success' && data.data && data.data.token) {
-        await saveToken(data.data.token);
-        await saveSession(data.data);
-        
-        if (data.data.refresh_token) {
-          await saveRefreshToken(data.data.refresh_token);
-        }
-
-        setToken(data.data.token);
-        setUser(data.data);
-        setLoading(false);
-        
-        return { success: true, user: data.data };
-      }
-
-      setLoading(false);
-      return { success: false, error: data.message || 'Неизвестная ошибка' };
-    } catch (err) {
-      setLoading(false);
-      const errorMessage = err.response?.data?.message || 
-                          err.message || 
-                          'Ошибка сети';
-      setError(errorMessage);
-      return { success: false, error: errorMessage };
-    }
-  }, [isOnline]);
+  const signIn = useCallback(async () => {
+    // Авторизация через WebView
+    return { success: true };
+  }, []);
 
   /**
-   * Register new user
-   * @param {string} username - Username
-   * @param {string} email - Email
-   * @param {string} password - Password
-   * @returns {Promise<Object>} - Result object with success status and user data
+   * Register new user (handled via WebView)
+   * @returns {Promise<Object>} - Result object with success status
    */
-  const signUp = useCallback(async (username, email, password) => {
-    setError(null);
-    setLoading(true);
-
-    try {
-      if (!isOnline) {
-        Alert.alert('Ошибка', 'Нет подключения к интернету');
-        return { success: false, error: 'Нет подключения к интернету' };
-      }
-
-      const response = await authAPI.register(username, email, password);
-      const data = response.data;
-
-      if (data.status === 'success' && data.data && data.data.token) {
-        await saveToken(data.data.token);
-        await saveSession(data.data);
-        
-        if (data.data.refresh_token) {
-          await saveRefreshToken(data.data.refresh_token);
-        }
-
-        setToken(data.data.token);
-        setUser(data.data);
-        setLoading(false);
-        
-        return { success: true, user: data.data };
-      }
-
-      setLoading(false);
-      return { success: false, error: data.message || 'Неизвестная ошибка' };
-    } catch (err) {
-      setLoading(false);
-      const errorMessage = err.response?.data?.message || 
-                          err.message || 
-                          'Ошибка сети';
-      setError(errorMessage);
-      return { success: false, error: errorMessage };
-    }
-  }, [isOnline]);
+  const signUp = useCallback(async () => {
+    // Регистрация через WebView
+    return { success: true };
+  }, []);
 
   /**
    * Sign out user
@@ -189,80 +114,65 @@ export const useAuth = () => {
 
       const response = await authAPI.refreshToken(refreshToken);
       const data = response.data;
-
+      
       if (data.status === 'success' && data.data && data.data.token) {
         await saveToken(data.data.token);
-        setToken(data.data.token);
+        await saveSession(data.data);
         
         if (data.data.refresh_token) {
           await saveRefreshToken(data.data.refresh_token);
         }
-
+        
+        setToken(data.data.token);
+        setUser(data.data);
         return true;
       }
-
+      
       await signOut();
       return false;
+      
     } catch (err) {
-      console.error('Token refresh failed:', err);
+      console.error('Failed to refresh token:', err);
       await signOut();
       return false;
     }
-  }, [signOut]);
+  }, []);
 
   /**
    * Get user profile
-   * @returns {Promise<Object|null>} - User profile or null
+   * @returns {Promise<Object>} - User profile data
    */
   const getProfile = useCallback(async () => {
     try {
-      if (!token) return null;
-      
       const response = await userAPI.getProfile();
       const data = response.data;
       
       if (data.status === 'success') {
         setUser(data.data);
-        await saveSession(data.data);
         return data.data;
       }
       
-      return null;
+      throw new Error(data.message || 'Failed to get profile');
+      
     } catch (err) {
       console.error('Failed to get profile:', err);
-      return null;
-    }
-  }, [token]);
-
-  /**
-   * Update user profile
-   * @param {Object} profileData - Data to update
-   * @returns {Promise<Object|null>} - Updated profile or null
-   */
-  const updateProfile = useCallback(async (profileData) => {
-    try {
-      const response = await userAPI.updateProfile(profileData);
-      const data = response.data;
-      
-      if (data.status === 'success') {
-        setUser(prev => ({ ...prev, ...data.data }));
-        await saveSession({ ...user, ...data.data });
-        return data.data;
-      }
-      
-      return null;
-    } catch (err) {
-      console.error('Failed to update profile:', err);
       throw err;
     }
-  }, [user]);
+  }, []);
 
   /**
    * Check if user is authenticated
-   * @returns {boolean}
+   * @returns {boolean} - True if authenticated
    */
-  const isAuthenticated = useCallback(async () => {
-    return await checkIsAuthenticated();
+  const isAuthenticated = useCallback(() => {
+    return !!token && !!user;
+  }, [token, user]);
+
+  /**
+   * Clear authentication error
+   */
+  const clearError = useCallback(() => {
+    setError(null);
   }, []);
 
   return {
@@ -271,13 +181,15 @@ export const useAuth = () => {
     loading,
     error,
     isOnline,
-    isAuthenticated,
     signIn,
     signUp,
     signOut,
     refreshToken,
     getProfile,
-    updateProfile,
+    isAuthenticated,
+    clearError,
+    setUser,
+    setToken,
   };
 };
 
