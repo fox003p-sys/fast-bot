@@ -1,8 +1,10 @@
 import React, { useState, useContext, useRef } from 'react';
-import { View, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
 import AuthContext from '../../context/AuthContext';
 import * as SecureStore from 'expo-secure-store';
+
+import { getWebAuthUrl, resolveWebAuthResult } from '../../utils/webAuth';
 
 const WebAuthScreen = ({ navigation, route }) => {
   const { setToken, setUser } = useContext(AuthContext);
@@ -10,31 +12,28 @@ const WebAuthScreen = ({ navigation, route }) => {
   const webViewRef = useRef(null);
   const { mode } = route.params; // 'login' или 'register'
 
-  const AUTH_URLS = {
-    login: 'https://vkserfing.com/login',
-    register: 'https://vkserfing.com/register',
+  // У сайта нет отдельных страниц /login и /register (они отдают 404):
+  // форма входа и регистрации встроена в главную страницу.
+  const AUTH_URL = getWebAuthUrl(mode);
+
+  const completeAuth = async (token) => {
+    if (token) {
+      await SecureStore.setItemAsync('userToken', token);
+    } else {
+      await SecureStore.setItemAsync('isLoggedIn', 'true');
+    }
+    setToken(token || 'web_auth_success');
+    setUser({ token: token || 'web_auth_success' });
+    navigation.replace('Bot');
   };
 
   const handleNavigation = async (navState) => {
     const { url } = navState;
 
-    // Проверяем успешный вход (редирект на главную или профиль)
-    if (url.includes('vkserfing.com/dashboard') || url.includes('vkserfing.com/profile') || url.includes('vkserfing.com/')) {
-      // Извлекаем токен из URL, если он есть
-      const tokenMatch = url.match(/[?&]token=([^&]+)/);
-      if (tokenMatch) {
-        const token = tokenMatch[1];
-        await SecureStore.setItemAsync('userToken', token);
-        setToken(token);
-        setUser({ token });
-        navigation.replace('Bot');
-        return;
-      }
-
-      // Если токен не в URL, просто помечаем, что пользователь залогинен
-      await SecureStore.setItemAsync('isLoggedIn', 'true');
-      setToken('web_auth_success');
-      navigation.replace('Bot');
+    const { success, token } = resolveWebAuthResult(AUTH_URL, url);
+    if (success) {
+      setLoading(false);
+      await completeAuth(token);
     }
   };
 
@@ -42,7 +41,7 @@ const WebAuthScreen = ({ navigation, route }) => {
     <View style={styles.container}>
       <WebView
         ref={webViewRef}
-        source={{ uri: AUTH_URLS[mode] || AUTH_URLS.login }}
+        source={{ uri: AUTH_URL }}
         onLoadEnd={() => setLoading(false)}
         onNavigationStateChange={handleNavigation}
         javaScriptEnabled={true}
